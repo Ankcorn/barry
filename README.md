@@ -56,17 +56,43 @@ sudo journalctl -u barry -f
 
 ## Gateway Setup
 
-The gateway is a Cloudflare Worker deployed via Git. Set the following secrets in the Cloudflare dashboard:
+The gateway is a Cloudflare Worker deployed via Wrangler. Set the following secrets:
 
-| Secret | Description |
-|--------|-------------|
-| `ACCESS_CLIENT_ID` | Cloudflare Access service token client ID |
-| `ACCESS_CLIENT_SECRET` | Cloudflare Access service token client secret |
-| `ACCESS_ISSUER` | Cloudflare Access issuer URL |
+```bash
+cd gateway
+npx wrangler secret put ACCESS_CLIENT_ID
+npx wrangler secret put ACCESS_CLIENT_SECRET
+npx wrangler secret put ACCESS_AUTHORIZATION_URL
+npx wrangler secret put ACCESS_TOKEN_URL
+npx wrangler secret put ACCESS_JWKS_URL
+npx wrangler secret put COOKIE_ENCRYPTION_KEY
+npx wrangler secret put ALLOWED_EMAIL
+```
+
+| Secret | Where to find it |
+|--------|-----------------|
+| `ACCESS_CLIENT_ID` | Cloudflare Access SaaS app → Client ID |
+| `ACCESS_CLIENT_SECRET` | Cloudflare Access SaaS app → Client secret |
+| `ACCESS_AUTHORIZATION_URL` | Cloudflare Access SaaS app → Authorization endpoint |
+| `ACCESS_TOKEN_URL` | Cloudflare Access SaaS app → Token endpoint |
+| `ACCESS_JWKS_URL` | Cloudflare Access SaaS app → Key endpoint |
+| `COOKIE_ENCRYPTION_KEY` | Any random secret (used to sign cookies) |
 | `ALLOWED_EMAIL` | The email address permitted to use the MCP server |
+
+Also add `https://<your-worker-domain>/callback` as an allowed redirect URI in the Cloudflare Access SaaS app settings.
+
+## Security
+
+MCP clients authenticate via OAuth 2.1 ([Workers OAuth Provider](https://github.com/cloudflare/workers-oauth-provider)) with [Dynamic Client Registration (RFC 7591)](https://datatracker.ietf.org/doc/html/rfc7591) — no manual client setup needed. Authentication delegates to [Cloudflare Access SaaS MCP](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/saas-mcp/) backed by GitHub, and the `email` from the signed JWT is checked against `ALLOWED_EMAIL` before any tools are reachable. New clients see an approval dialog on first connect.
 
 ## MCP Endpoint
 
 ```
 https://barry.ankcorn.dev/mcp
+```
+
+To deregister a client, delete the corresponding `client:<id>` key from the `OAUTH_KV` namespace via the Cloudflare dashboard or:
+
+```bash
+npx wrangler kv key delete "client:<id>" --namespace-id <namespace-id> --remote
 ```

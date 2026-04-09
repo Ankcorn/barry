@@ -3,7 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { Logger } from "hatchlet";
 import { z } from "zod";
-import { handleAccessRequest } from "./access-handler";
+import { cloudflareAccessApp } from "./access-handler";
 import type { Props } from "./workers-oauth-utils";
 
 const audit = new Logger();
@@ -16,7 +16,7 @@ const mcpHandler = {
   ): Promise<Response> {
     const props = ctx.props;
     if (props.email !== env.ALLOWED_EMAIL) {
-      audit.warn`event=${"auth.forbidden"} email=${{email: props.email}}`;
+      audit.warn`event=${"auth.forbidden"} email=${{ email: props.email }}`;
       return new Response("Forbidden", { status: 403 });
     }
 
@@ -42,7 +42,6 @@ const mcpHandler = {
           "Skills are sets of best-practice instructions for specific tasks. Before starting a task that matches a skill, read the SKILL.md file and follow its guidance.\n\n" +
           "Available skills (located in ~/skills/):\n" +
           "- playwright-skill (~/skills/playwright-skill/skills/playwright-skill/SKILL.md): Complete browser automation with Playwright. Use when testing websites, automating browser interactions, validating web functionality, filling forms, taking screenshots, or performing any browser-based task.",
-
       },
     );
 
@@ -59,7 +58,7 @@ const mcpHandler = {
           .describe("Timeout in seconds (no default — runs until completion)"),
       },
       async ({ command, timeout }) => {
-        audit.info`event=${"tool.bash"} email=${{email: props.email}} command=${{command}}`;
+        audit.info`event=${"tool.bash"} email=${{ email: props.email }} command=${{ command }}`;
         try {
           const response = await env.VPC_SERVICE.fetch(
             "http://localhost:3000/bash",
@@ -76,15 +75,17 @@ const mcpHandler = {
             fullOutputPath?: string;
           };
           if (result.exitCode !== 0) {
-            audit.warn`event=${"tool.bash.error"} email=${{email: props.email}} command=${{command}} exitCode=${{exitCode: result.exitCode}}`;
+            audit.warn`event=${"tool.bash.error"} email=${{ email: props.email }} command=${{ command }} exitCode=${{ exitCode: result.exitCode }}`;
           }
           const output = result.stdout + result.stderr;
           return {
-            content: [{ type: "text", text: `exit ${result.exitCode}\n${output}` }],
+            content: [
+              { type: "text", text: `exit ${result.exitCode}\n${output}` },
+            ],
           };
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
-          audit.error`event=${"tool.bash.throw"} email=${{email: props.email}} command=${{command}} error=${{error}}`;
+          audit.error`event=${"tool.bash.throw"} email=${{ email: props.email }} command=${{ command }} error=${{ error }}`;
           throw err;
         }
       },
@@ -111,7 +112,7 @@ const mcpHandler = {
           .describe("Maximum number of lines to read (default 2000)"),
       },
       async ({ path, offset, limit }) => {
-        audit.info`event=${"tool.read"} email=${{email: props.email}} path=${{path}}`;
+        audit.info`event=${"tool.read"} email=${{ email: props.email }} path=${{ path }}`;
         try {
           const response = await env.VPC_SERVICE.fetch(
             "http://localhost:3000/read",
@@ -133,8 +134,10 @@ const mcpHandler = {
             nextOffset?: number;
           };
           if (result.error) {
-            audit.warn`event=${"tool.read.error"} email=${{email: props.email}} path=${{path}} error=${{error: result.error}}`;
-            return { content: [{ type: "text", text: `Error: ${result.error}` }] };
+            audit.warn`event=${"tool.read.error"} email=${{ email: props.email }} path=${{ path }} error=${{ error: result.error }}`;
+            return {
+              content: [{ type: "text", text: `Error: ${result.error}` }],
+            };
           }
           let text = result.content ?? "";
           if (result.hasMore) {
@@ -143,7 +146,7 @@ const mcpHandler = {
           return { content: [{ type: "text", text }] };
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
-          audit.error`event=${"tool.read.throw"} email=${{email: props.email}} path=${{path}} error=${{error}}`;
+          audit.error`event=${"tool.read.throw"} email=${{ email: props.email }} path=${{ path }} error=${{ error }}`;
           throw err;
         }
       },
@@ -159,7 +162,7 @@ const mcpHandler = {
         content: z.string().describe("Content to write to the file"),
       },
       async ({ path, content }) => {
-        audit.info`event=${"tool.write"} email=${{email: props.email}} path=${{path}} bytes=${{bytes: new TextEncoder().encode(content).byteLength}}`;
+        audit.info`event=${"tool.write"} email=${{ email: props.email }} path=${{ path }} bytes=${{ bytes: new TextEncoder().encode(content).byteLength }}`;
         try {
           const response = await env.VPC_SERVICE.fetch(
             "http://localhost:3000/write",
@@ -175,15 +178,22 @@ const mcpHandler = {
             error?: string;
           };
           if (result.error) {
-            audit.warn`event=${"tool.write.error"} email=${{email: props.email}} path=${{path}} error=${{error: result.error}}`;
-            return { content: [{ type: "text", text: `Error: ${result.error}` }] };
+            audit.warn`event=${"tool.write.error"} email=${{ email: props.email }} path=${{ path }} error=${{ error: result.error }}`;
+            return {
+              content: [{ type: "text", text: `Error: ${result.error}` }],
+            };
           }
           return {
-            content: [{ type: "text", text: `Successfully wrote ${result.bytesWritten} bytes to ${path}` }],
+            content: [
+              {
+                type: "text",
+                text: `Successfully wrote ${result.bytesWritten} bytes to ${path}`,
+              },
+            ],
           };
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
-          audit.error`event=${"tool.write.throw"} email=${{email: props.email}} path=${{path}} error=${{error}}`;
+          audit.error`event=${"tool.write.throw"} email=${{ email: props.email }} path=${{ path }} error=${{ error }}`;
           throw err;
         }
       },
@@ -230,14 +240,22 @@ const mcpHandler = {
           .describe("Maximum number of matches to return (default: 100)"),
       },
       async ({ pattern, path, glob, ignoreCase, literal, context, limit }) => {
-        audit.info`event=${"tool.grep"} email=${{email: props.email}} pattern=${{pattern}} path=${{path: path ?? "."}}`;
+        audit.info`event=${"tool.grep"} email=${{ email: props.email }} pattern=${{ pattern }} path=${{ path: path ?? "." }}`;
         try {
           const response = await env.VPC_SERVICE.fetch(
             "http://localhost:3000/grep",
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ pattern, path, glob, ignoreCase, literal, context, limit }),
+              body: JSON.stringify({
+                pattern,
+                path,
+                glob,
+                ignoreCase,
+                literal,
+                context,
+                limit,
+              }),
             },
           );
           const result = (await response.json()) as {
@@ -247,8 +265,10 @@ const mcpHandler = {
             error?: string;
           };
           if (result.error) {
-            audit.warn`event=${"tool.grep.error"} email=${{email: props.email}} pattern=${{pattern}} error=${{error: result.error}}`;
-            return { content: [{ type: "text", text: `Error: ${result.error}` }] };
+            audit.warn`event=${"tool.grep.error"} email=${{ email: props.email }} pattern=${{ pattern }} error=${{ error: result.error }}`;
+            return {
+              content: [{ type: "text", text: `Error: ${result.error}` }],
+            };
           }
           let text = result.output ?? "No matches found";
           if (result.limitReached) {
@@ -257,7 +277,7 @@ const mcpHandler = {
           return { content: [{ type: "text", text }] };
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
-          audit.error`event=${"tool.grep.throw"} email=${{email: props.email}} pattern=${{pattern}} error=${{error}}`;
+          audit.error`event=${"tool.grep.throw"} email=${{ email: props.email }} pattern=${{ pattern }} error=${{ error }}`;
           throw err;
         }
       },
@@ -275,6 +295,7 @@ export default new OAuthProvider({
   apiHandler: mcpHandler,
   apiRoute: "/mcp",
   authorizeEndpoint: "/authorize",
-  defaultHandler: handleAccessRequest,
+  clientRegistrationEndpoint: "/register",
+  defaultHandler: cloudflareAccessApp as any,
   tokenEndpoint: "/token",
 });

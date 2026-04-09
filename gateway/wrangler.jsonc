@@ -37,7 +37,10 @@
     "required": [
       "ACCESS_CLIENT_ID",
       "ACCESS_CLIENT_SECRET",
-      "ACCESS_ISSUER",
+      "ACCESS_AUTHORIZATION_URL",
+      "ACCESS_TOKEN_URL",
+      "ACCESS_JWKS_URL",
+      "COOKIE_ENCRYPTION_KEY",
       "ALLOWED_EMAIL",
     ],
   },
