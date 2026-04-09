@@ -88,7 +88,7 @@ MCP clients authenticate via OAuth 2.1 ([Workers OAuth Provider](https://github.
 ## MCP Endpoint
 
 ```
-https://barry.ankcorn.dev/mcp
+https://<your-worker-domain>/mcp
 ```
 
 To deregister a client, delete the corresponding `client:<id>` key from the `OAUTH_KV` namespace via the Cloudflare dashboard or:
