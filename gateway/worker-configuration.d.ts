@@ -7,7 +7,8 @@ declare namespace Cloudflare {
 	}
 	interface Env {
 		OAUTH_KV: KVNamespace;
-		VPC_SERVICE: Fetcher;
+		BARRY_VPC_SERVICE: Fetcher;
+		BERRY_VPC_SERVICE: Fetcher;
 		ACCESS_CLIENT_ID: string;
 		ACCESS_CLIENT_SECRET: string;
 		ACCESS_ISSUER: string;
