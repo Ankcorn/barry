@@ -16,8 +16,13 @@
   ],
   "vpc_services": [
     {
-      "binding": "VPC_SERVICE",
+      "binding": "BARRY_VPC_SERVICE",
       "service_id": "019d5551-8b27-7b63-9bfa-a77983feca68",
+      "remote": true,
+    },
+    {
+      "binding": "BERRY_VPC_SERVICE",
+      "service_id": "TODO_BERRY_SERVICE_ID",
       "remote": true,
     },
   ],

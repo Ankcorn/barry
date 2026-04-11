@@ -19,11 +19,11 @@ const BASH_TOOL_PARAMS = {
 };
 
 async function executeBash(
-  env: Env,
+  service: Fetcher,
   command: string,
   timeout?: number,
 ): Promise<{ text: string }> {
-  const response = await env.VPC_SERVICE.fetch("http://localhost:3000/bash", {
+  const response = await service.fetch("http://localhost:3000/bash", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ command, timeout }),
@@ -55,9 +55,10 @@ const mcpHandler = {
       {
         instructions:
           "You have direct shell access to two Raspberry Pis:\n" +
-          "- barry: the local Pi running this MCP server\n" +
-          "- berry: a second Pi accessible via SSH from barry\n\n" +
-          "Use bashBarry for commands on barry, bashBerry for commands on berry.\n\n" +
+          "- barry: the primary Pi running this MCP server\n" +
+          "- berry: a second Pi with its own independent server and Cloudflare Tunnel\n\n" +
+          "Use bashBarry for commands on barry, bashBerry for commands on berry.\n" +
+          "Both Pis run independently — there is no single point of failure.\n\n" +
           "Available CLI tools on both Pis:\n" +
           "- git, curl, wget, bash, python3/pip3\n\n" +
           "Additional tools on barry:\n" +
@@ -73,12 +74,12 @@ const mcpHandler = {
 
     server.tool(
       "bashBarry",
-      "Execute a bash command on barry (the local Raspberry Pi). Returns the last 2000 lines / 200KB of output. Optionally provide a timeout in seconds.",
+      "Execute a bash command on barry (the primary Raspberry Pi). Returns the last 2000 lines / 200KB of output. Optionally provide a timeout in seconds.",
       BASH_TOOL_PARAMS,
       async ({ command, timeout }) => {
         audit.info`event=${"tool.bashBarry"} email=${{ email: props.email }} command=${{ command }}`;
         try {
-          const { text } = await executeBash(env, command, timeout);
+          const { text } = await executeBash(env.BARRY_VPC_SERVICE, command, timeout);
           return { content: [{ type: "text", text }] };
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
@@ -90,15 +91,12 @@ const mcpHandler = {
 
     server.tool(
       "bashBerry",
-      "Execute a bash command on berry (a second Raspberry Pi accessible via SSH from barry). Returns the last 2000 lines / 200KB of output. Optionally provide a timeout in seconds.",
+      "Execute a bash command on berry (a second independent Raspberry Pi with its own server). Returns the last 2000 lines / 200KB of output. Optionally provide a timeout in seconds.",
       BASH_TOOL_PARAMS,
       async ({ command, timeout }) => {
         audit.info`event=${"tool.bashBerry"} email=${{ email: props.email }} command=${{ command }}`;
-        // Escape the command for SSH: wrap in single quotes, escaping any single quotes within
-        const escaped = command.replace(/'/g, `'\\''`);
-        const sshCommand = `ssh -o BatchMode=yes -o ConnectTimeout=10 berry '${escaped}'`;
         try {
-          const { text } = await executeBash(env, sshCommand, timeout);
+          const { text } = await executeBash(env.BERRY_VPC_SERVICE, command, timeout);
           return { content: [{ type: "text", text }] };
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
