@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import type { AuthRequest, OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 import { Hono } from "hono";
+import { Logger } from "hatchlet";
 import {
 	addApprovedClient,
 	createOAuthState,
@@ -24,6 +25,7 @@ type Bindings = Env & {
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
+const audit = new Logger();
 
 app.get("/authorize", async (c) => {
 	const oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
@@ -74,6 +76,7 @@ app.post("/authorize", async (c) => {
 		return redirectToAccess(c.req.raw, c.env, stateToken, codeChallenge, headers);
 	} catch (error) {
 		if (error instanceof OAuthError) return error.toResponse();
+		audit.error`authorize failed: ${{ error }}`;
 		return c.text("Internal server error", 500);
 	}
 });
@@ -86,6 +89,7 @@ app.get("/callback", async (c) => {
 		({ oauthReqInfo, codeVerifier } = await validateOAuthState(c.req.raw, c.env.OAUTH_KV, c.env.COOKIE_ENCRYPTION_KEY));
 	} catch (error) {
 		if (error instanceof OAuthError) return error.toResponse();
+		audit.error`callback state validation failed: ${{ error }}`;
 		return c.text("Internal server error", 500);
 	}
 
