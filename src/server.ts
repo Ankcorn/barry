@@ -161,6 +161,7 @@ app.post("/bash", async (c) => {
     child.on("error", (err) => {
       if (timeoutHandle) clearTimeout(timeoutHandle);
       endTempStream();
+      console.error(`bash spawn failed: command=${command}`, err);
       resolve(c.json({ stdout: "", stderr: err.message, exitCode: 1 }));
     });
 
@@ -203,7 +204,13 @@ app.post("/read", async (c) => {
     return c.json({ error: `Cannot read file: ${path}` }, 400);
   }
 
-  const buffer = await readFile(path);
+  let buffer: Buffer;
+  try {
+    buffer = await readFile(path);
+  } catch (err) {
+    console.error(`read failed: path=${path}`, err);
+    return c.json({ error: `Cannot read file: ${path}` }, 400);
+  }
   const text = buffer.toString("utf-8");
   const allLines = text.split("\n");
   const totalLines = allLines.length;
@@ -338,11 +345,12 @@ app.post("/grep", async (c) => {
       resolve(c.json({ output, matchCount: matches.length, limitReached }));
     });
 
-    child.on("error", () => {
+    child.on("error", (err) => {
       if (settled) return;
       settled = true;
       clearTimeout(grepTimeout);
       rl.close();
+      console.error(`grep spawn failed: pattern=${pattern} path=${searchPath}`, err);
       resolve(c.json({ error: "ripgrep (rg) not found — install with: sudo apt install ripgrep" }, 500));
     });
   });
