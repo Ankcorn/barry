@@ -1,3 +1,5 @@
+
+
 # barry
 
 An MCP server that gives Claude direct access to a Raspberry Pi over a Cloudflare Tunnel.
@@ -67,6 +69,7 @@ npx wrangler secret put ACCESS_TOKEN_URL
 npx wrangler secret put ACCESS_JWKS_URL
 npx wrangler secret put COOKIE_ENCRYPTION_KEY
 npx wrangler secret put ALLOWED_EMAIL
+npx wrangler deploy
 ```
 
 | Secret | Where to find it |
