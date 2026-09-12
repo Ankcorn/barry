@@ -26,26 +26,30 @@ type Bindings = Env & {
 const app = new Hono<{ Bindings: Bindings }>();
 
 app.get("/authorize", async (c) => {
-	const oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
-	const { clientId } = oauthReqInfo;
-	if (!clientId) return c.text("Invalid request", 400);
+	try {
+		const oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
+		const { clientId } = oauthReqInfo;
+		if (!clientId) return c.text("Invalid request", 400);
 
-	if (await isClientApproved(c.req.raw, clientId, c.env.COOKIE_ENCRYPTION_KEY)) {
-		const { stateToken, codeChallenge } = await createOAuthState(oauthReqInfo, c.env.OAUTH_KV, c.env.COOKIE_ENCRYPTION_KEY);
-		return redirectToAccess(c.req.raw, c.env, stateToken, codeChallenge);
+		if (await isClientApproved(c.req.raw, clientId, c.env.COOKIE_ENCRYPTION_KEY)) {
+			const { stateToken, codeChallenge } = await createOAuthState(oauthReqInfo, c.env.OAUTH_KV, c.env.COOKIE_ENCRYPTION_KEY);
+			return redirectToAccess(c.req.raw, c.env, stateToken, codeChallenge);
+		}
+
+		const { token: csrfToken, setCookie } = generateCSRFProtection();
+		return renderApprovalDialog(c.req.raw, {
+			client: await c.env.OAUTH_PROVIDER.lookupClient(clientId),
+			csrfToken,
+			server: {
+				name: "Barry",
+				description: "Personal MCP server running on my Raspberry Pi.",
+			},
+			setCookie,
+			state: { oauthReqInfo },
+		});
+	} catch (error) {
+		return oauthErrorResponse(error);
 	}
-
-	const { token: csrfToken, setCookie } = generateCSRFProtection();
-	return renderApprovalDialog(c.req.raw, {
-		client: await c.env.OAUTH_PROVIDER.lookupClient(clientId),
-		csrfToken,
-		server: {
-			name: "Barry",
-			description: "Personal MCP server running on my Raspberry Pi.",
-		},
-		setCookie,
-		state: { oauthReqInfo },
-	});
 });
 
 app.post("/authorize", async (c) => {
@@ -136,6 +140,28 @@ function redirectToAccess(request: Request, env: Bindings, stateToken: string, c
 		upstream_url: env.ACCESS_AUTHORIZATION_URL,
 	}));
 	return new Response(null, { status: 302, headers });
+}
+
+function oauthErrorResponse(error: unknown): Response {
+	if (error instanceof OAuthError) return error.toResponse();
+
+	// Validation failures raised by OAUTH_PROVIDER.parseAuthRequest are plain
+	// Errors describing client input (unknown client, invalid redirect URI,
+	// disallowed PKCE or implicit flow). Anything else is a server error.
+	const message = error instanceof Error ? error.message : String(error);
+	if (
+		message.startsWith("Invalid client") ||
+		message.startsWith("Invalid redirect URI") ||
+		message.startsWith("The implicit grant flow") ||
+		message.startsWith("The plain PKCE method") ||
+		message.startsWith("The resource parameter")
+	) {
+		return new Response(
+			JSON.stringify({ error: "invalid_request", error_description: message }),
+			{ status: 400, headers: { "Content-Type": "application/json" } },
+		);
+	}
+	return new Response("Internal server error", { status: 500 });
 }
 
 async function fetchAccessPublicKey(env: Bindings, kid: string): Promise<CryptoKey> {
